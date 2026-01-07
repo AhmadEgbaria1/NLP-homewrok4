@@ -8,14 +8,20 @@ from sklearn.metrics.pairwise import cosine_similarity
 
 
 # ---------- Tokenization ----------
+# Extract Hebrew word tokens (ignores numbers/latin/punctuation). Keeps internal quotes/apostrophes.
 HEB_TOKEN_RE = re.compile(r"[א-ת]+(?:[\"״׳']+[א-ת]+)*")
 
 def tokenize_sentence(sentence: str):
     return HEB_TOKEN_RE.findall(sentence)
 
 
-# ---------- Load corpus (robust JSONL) ----------
+# ---------- Load corpus  ----------
 def load_sentences(path):
+    """
+      Load a JSONL corpus robustly.
+      Each line is expected to be a JSON object with a 'sentence_text' field.
+      We skip empty/invalid lines and keep both tokenized and original sentences.
+      """
     sentences = []
     original_sentences = []
 
@@ -35,25 +41,27 @@ def load_sentences(path):
                     sentences.append(tokens)
                     original_sentences.append(sent)
             except Exception:
+                # Robustness: ignore malformed JSON lines
                 continue
 
     return sentences, original_sentences
 
 
 # ---------- Sentence embedding ----------
+# Mean vector of all tokens that exist in the model vocabulary
 def sentence_embedding(tokens, model):
     vectors = [model.wv[w] for w in tokens if w in model.wv]
     if not vectors:
         return None
     return np.mean(vectors, axis=0)
 
-
+# ---------- Word replacement helper ----------
 def pick_replacement(model, target, topn=3, positive=None, negative=None):
     """
-    מחזיר מילה חלופית למילת יעד.
-    - אם target לא ב-vocab: מחזיר None
-    - משתמש ב most_similar עם אפשרות ל positive/negative
-    """
+        Pick a replacement word for 'target' using Word2Vec most_similar.
+        If 'positive' is not given, we default to [target].
+        Returns None if target is OOV or if most_similar fails.
+        """
     wv = model.wv
     if target not in wv:
         return None
@@ -61,7 +69,7 @@ def pick_replacement(model, target, topn=3, positive=None, negative=None):
     pos = positive[:] if positive else []
     neg = negative[:] if negative else []
 
-    # אם לא הועברו positive בכלל, נתחיל מהמילה עצמה
+
     if not pos:
         pos = [target]
 
@@ -70,7 +78,7 @@ def pick_replacement(model, target, topn=3, positive=None, negative=None):
     except Exception:
         return None
 
-    # בחר את הראשון שהוא לא אותה מילה
+
     for cand, _score in candidates:
         if cand != target:
             return cand
@@ -78,13 +86,19 @@ def pick_replacement(model, target, topn=3, positive=None, negative=None):
 
 
 def replace_word_in_sentence(sentence, old, new):
-    # מחליף מילה שלמה, גם אם יש סימן פיסוק אחריה
+    """
+       Replace a single exact word occurrence (first match only).
+       Note: \b may be imperfect for Hebrew in edge cases, but works for many clean tokens.
+       """
     pattern = rf'\b{re.escape(old)}\b'
     return re.sub(pattern, new, sentence, count=1)
 
-
+# ---------- Part D ----------
 def do_section_d(model, out_dir):
-    # 5 המשפטים מהתרגיל
+    """
+        Replace the words marked 'in red' in the given 5 sentences.
+        The list RED_WORDS_PER_SENT must match the exact words required by the assignment.
+        """
     SENTS = [
         "בשעות הקרובות נפתח את הדיון בסעיף הבא שעל סדר היום",
         "אבקש מהנוכחים להתיישב כדי שנוכל להתחיל.",
@@ -93,8 +107,7 @@ def do_section_d(model, out_dir):
         "ההצעה הובאה להצבעה ואושרה."
     ]
 
-    # כאן אתה קובע מה “באדום”.
-    # כרגע שמתי ניחוש של מילה אחת בכל משפט — תשנה לפי מה שמסומן אצלך.
+    # the red words
     RED_WORDS_PER_SENT = [
         ["בשעות", "בסעיף"],
         ["אבקש", "להתיישב"],
@@ -103,11 +116,10 @@ def do_section_d(model, out_dir):
         ["הובאה", "ואושרה"]
     ]
 
-    # אם אתה רוצה לכוון עם positive/negative, אפשר להגדיר פה לכל מילה אדומה:
-    # המפתח הוא (index_sentence, red_word)
-    # הערכים: dict עם positive/negative/topn
+
+
     CONTROL = {
-        # משפט 1: בשעות הקרובות ... בסעיף הבא
+
         (0, "בשעות"): {
             "positive": [ "השעות","זמן"],
             "negative": ["טיסות"]
@@ -117,14 +129,14 @@ def do_section_d(model, out_dir):
             "negative": ["ג", "סעיף"]
         },
 
-        # משפט 2: אבקש ... להתיישב
+
 
         (1, "להתיישב"): {
             "positive": ["לשבת", "להתכנס"],
             "negative": ["פצצות", "מלחמה"]
         },
 
-        # משפט 3: לצוות המקצועי ... עבודתו
+
         (2, "לצוות"): {
             "positive": [ "לעובדים"],
             "negative": ["למזכירות"]
@@ -136,7 +148,7 @@ def do_section_d(model, out_dir):
 
 
 
-        # משפט 5: הובאה ... ואושרה
+
         (4, "הובאה"): {
             "positive": ["הוגשה", "הוצגה"],
             "negative": ["שתדון"]
@@ -147,7 +159,7 @@ def do_section_d(model, out_dir):
         }
     }
 
-    out_path = os.path.join(out_dir, "sentences_words_red.txt")
+    out_path = os.path.join(out_dir, "red_words_sentences.txt")
     with open(out_path, "w", encoding="utf8") as f:
         for i, sent in enumerate(SENTS, start=1):
             new_sent = sent
@@ -163,7 +175,7 @@ def do_section_d(model, out_dir):
                     negative=cfg.get("negative")
                 )
 
-                # אם לא מצא (לא במילון וכו’) – מדלגים
+
                 if not repl:
                     continue
 
@@ -189,56 +201,77 @@ def main():
     out_dir = sys.argv[2]
     os.makedirs(out_dir, exist_ok=True)
 
-    # ----- Part A: Load + Train -----
+    # Part A: load + train Word2Vec
     tokenized_sentences, original_sentences = load_sentences(corpus_path)
     print("Number of sentences:", len(tokenized_sentences))
 
-    model = Word2Vec(
-        sentences=tokenized_sentences,
-        vector_size=77,
-        window=8,
-        min_count=2,
-        workers=4,
-        epochs=10
-    )
+    # Word2Vec hyperparameters:
+    # vector_size: embedding dimension
+    # window: context window size
+    # min_count: ignore words with total frequency < min_count
+    try:
+        model = Word2Vec(
+            sentences=tokenized_sentences,
+            vector_size=77,
+            window=8,
+            min_count=2,
+            workers=4,
+            epochs=10
+        )
+    except Exception as e:
+        print("Error during Word2Vec training:", e)
+        sys.exit(1)
 
-    model_path = os.path.join(out_dir, "knesset_word2vec.model")
-    model.save(model_path)
+    try:
+        model.save(os.path.join(out_dir, "knesset_word2vec.model"))
+    except Exception as e:
+        print("Error saving Word2Vec model:", e)
+        sys.exit(1)
 
-    # ----- Part B.1: Similar words -----
+    # Part B.1: for each given word, find the top-5 most similar words
+    # Similarity is computed using cosine similarity between embedding vectors (via model.wv.similarity).
     words = ["יום", "אישה", "דרך", "ארוך", "תוכנית", "אוהב", "אסור", "איתן", "זכות"]
-    with open(os.path.join(out_dir, "words_similar_knesset.txt"), "w", encoding="utf8") as f:
+    with open(os.path.join(out_dir, "knesset_similar_words.txt"), "w", encoding="utf8") as f:
         for w in words:
             if w not in model.wv:
+                f.write(f"{w}: word not in vocabulary\n")
                 continue
-            sims = model.wv.most_similar(w, topn=5)
-            line = f"{w}: " + ", ".join([f"({x},{s:.3f})" for x, s in sims])
-            f.write(line + "\n")
 
-    # ----- Part B.2 + B.3: Sentence similarity -----
+            sims = []
+            for other in model.wv.index_to_key:
+                if other != w:
+                    sims.append((other, model.wv.similarity(w, other)))
+
+            sims.sort(key=lambda x: x[1], reverse=True)
+            top5 = sims[:5]
+            f.write(f"{w}: " + ", ".join(f"({x},{s:.3f})" for x, s in top5) + "\n")
+
+    # Part B.2 + B.3: sentence similarity using mean word vectors (excluding OOV tokens)
+    # We keep only sentences with at least 4 *valid* tokens (tokens that exist in model vocabulary).
     sent_vectors = []
     valid_sentences = []
 
     for toks, sent in zip(tokenized_sentences, original_sentences):
-        vec = sentence_embedding(toks, model)
-        if vec is not None and len(toks) >= 4:
-            sent_vectors.append(vec)
-            valid_sentences.append(sent)
+        valid_tokens = [w for w in toks if w in model.wv]
+        if len(valid_tokens) >= 4:
+            vec = sentence_embedding(toks, model)
+            if vec is not None:
+                sent_vectors.append(vec)
+                valid_sentences.append(sent)
 
     sent_vectors = np.array(sent_vectors)
-    # בחר 10 משפטים ראשונים "תקינים"
     chosen_idx = list(range(min(10, len(sent_vectors))))
 
-    with open(os.path.join(out_dir, "sentences_similar_knesset.txt"), "w", encoding="utf8") as f:
+    with open(os.path.join(out_dir, "knesset_similar_sentences.txt"), "w", encoding="utf8") as f:
         for i in chosen_idx:
-            # דמיון של וקטור אחד מול כל הוקטורים (לא NxN!)
             scores = cosine_similarity(sent_vectors[i].reshape(1, -1), sent_vectors)[0]
-            scores[i] = -1  # כדי לא לבחור את עצמו
+            scores[i] = -1  # exclude self-match
             best = int(np.argmax(scores))
             f.write(f"{valid_sentences[i]}: most similar sentence: {valid_sentences[best]}\n")
-    #part d
+
     do_section_d(model, out_dir)
 
 
 if __name__ == "__main__":
     main()
+
