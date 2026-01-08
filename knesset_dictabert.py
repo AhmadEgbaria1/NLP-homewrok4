@@ -1,12 +1,11 @@
 import sys
 import os
-# The homework permits using transformers and torch for Part D [cite: 140]
 from transformers import AutoModelForMaskedLM, AutoTokenizer, pipeline
 
 
 def main():
     # 1. Parse Command Line Arguments
-    # Expects: python knesset_dictabert.py <input_file> <output_dir> [cite: 179]
+
     if len(sys.argv) < 3:
         print("Usage: python knesset_dictabert.py <path/to/masked_sampled_sents.txt> <output_dir>")
         sys.exit(1)
@@ -20,14 +19,11 @@ def main():
 
     output_path = os.path.join(output_dir, "dictabert_results.txt")
 
-    print("Loading DictaBERT model... (this may take a minute)")
+    #print("Loading DictaBERT model... (this may take a minute)")
 
-    # ==============================================================================
-    # WHERE WE USE DICTABERT
-    # ==============================================================================
+
     # We use the Hugging Face 'pipeline' API.
     # This automatically downloads the 'dicta-il/dictabert' model and sets it up.
-    # task="fill-mask": Tells the model its job is to fill in [MASK] tokens.
     # ==============================================================================
     try:
         mask_filler = pipeline("fill-mask", model="dicta-il/dictabert")
@@ -42,9 +38,7 @@ def main():
     with open(input_path, 'r', encoding='utf-8') as f:
         # Read the file. The file format from HW2 usually has lines like:
         # "masked_sentence: ... origin: ..." or just raw sentences.
-        # We assume the line itself is the masked sentence or contains it.
-        # Based on typical formats, we will process the whole line or split if needed.
-        # The instruction says "Use the file masked_sampled_sents.txt you created in HW2" [cite: 129]
+
 
         lines = f.readlines()
 
@@ -55,7 +49,6 @@ def main():
                 continue
 
             # 2. Preprocessing: Replace [*] with [MASK]
-            # Requirement: "Replace the asterisks [*] with the token [MASK]" [cite: 129]
             masked_text = original_line.replace("[*]", "[MASK]")
 
             # If there are no masks (maybe a header line?), just skip or write as is
@@ -69,8 +62,8 @@ def main():
 
             # 4. Handle Results
             # The pipeline returns different structures depending on how many masks are in the sentence.
-            # Case A: Single Mask -> returns a list of dicts (e.g., [guess1, guess2...])
-            # Case B: Multiple Masks -> returns a list of lists (e.g., [[mask1_guesses], [mask2_guesses]])
+            # Case A: Single Mask -> returns a list of dicts
+            # Case B: Multiple Masks -> returns a list of lists
 
             generated_tokens = []
             final_sentence = masked_text
@@ -80,14 +73,12 @@ def main():
                 predictions = [predictions]
 
                 # Sort predictions by their appearance in the sentence to replace correctly
-            # (HuggingFace usually returns them in order, but we iterate carefully)
+
 
             current_token_idx = 0
 
-            # We need to rebuild the sentence. A simple way with the pipeline output:
-            # The pipeline output objects contain 'token_str' (the word) and 'sequence' (the full sentence).
-            # However, with multiple masks, 'sequence' only fills ONE mask at a time in some versions.
-            # So we will manually collect the tokens and replace [MASK] one by one.
+
+
 
             for pred_group in predictions:
                 # pred_group is a list of top_k guesses for ONE specific mask.
@@ -98,11 +89,9 @@ def main():
                 generated_tokens.append(token)
 
                 # Replace the *first* occurrence of [MASK] with this token
-                # This works because the predictions list corresponds to masks left-to-right
                 final_sentence = final_sentence.replace("[MASK]", token, 1)
 
             # 5. Format Output
-            # Format requirements :
             # masked_sentence: <original>
             # dictaBERT_sentence: <filled>
             # dictaBERT_tokens: <list>
