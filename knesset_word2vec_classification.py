@@ -70,7 +70,7 @@ def load_corpus(path):
                 return v.strip()
         return None
 
-    print(f"Loading corpus from: {path}...")
+   # print(f"Loading corpus from: {path}...")
     with open(path, encoding='utf8') as f:
         for line in f:
             if not line.strip():
@@ -114,7 +114,7 @@ def main():
     model_path = sys.argv[2]
 
     # 1. Load Model
-    print(f"Loading Word2Vec model from: {model_path}...")
+
     try:
         model = Word2Vec.load(model_path)
     except Exception as e:
@@ -153,7 +153,7 @@ def main():
     print("After balance:", filtered_df['speaker'].value_counts().to_dict())
 
     # 5. Feature Extraction
-    print("Generating sentence embeddings...")
+
     filtered_df['tokens'] = filtered_df['text'].apply(tokenize_sentence)
     X = np.array([get_sentence_embedding(tokens, model) for tokens in filtered_df['tokens']])
     y = filtered_df['speaker'].values
@@ -161,7 +161,7 @@ def main():
     # 6. Classification
     knn = KNeighborsClassifier(n_neighbors=5)
 
-    print("Running 5-Fold Cross Validation...")
+
     try:
         y_pred = cross_val_predict(knn, X, y, cv=5)
         print("\nClassification Report:")

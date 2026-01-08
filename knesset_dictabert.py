@@ -7,7 +7,7 @@ def main():
     # 1. Parse Command Line Arguments
 
     if len(sys.argv) < 3:
-        print("Usage: python knesset_dictabert.py <path/to/masked_sampled_sents.txt> <output_dir>")
+        #print("Usage: python knesset_dictabert.py <path/to/masked_sampled_sents.txt> <output_dir>")
         sys.exit(1)
 
     input_path = sys.argv[1]
@@ -28,10 +28,10 @@ def main():
     try:
         mask_filler = pipeline("fill-mask", model="dicta-il/dictabert")
     except Exception as e:
-        print(f"Error loading DictaBERT. Make sure you installed 'transformers' and 'torch'.\nDetails: {e}")
+        #print(f"Error loading DictaBERT. Make sure you installed 'transformers' and 'torch'.\nDetails: {e}")
         sys.exit(1)
 
-    print(f"Processing file: {input_path}...")
+    #print(f"Processing file: {input_path}...")
 
     results = []
 
@@ -103,7 +103,7 @@ def main():
             out_f.write(f"dictaBERT_tokens: {tokens_str}\n")
             out_f.write("\n")  # Empty line separation
 
-    print(f"Done! Results saved to: {output_path}")
+    #print(f"Done! Results saved to: {output_path}")
 
 
 if __name__ == "__main__":

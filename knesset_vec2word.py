@@ -189,8 +189,8 @@ def do_section_d(model, out_dir):
                 pairs_str = ""
             f.write(f"replaced words: {pairs_str}\n")
 
-    print("Wrote:", out_path)
-
+   # print("Wrote:", out_path)
+'''
 def print_pair_similarities(model: Word2Vec):
         pairs = [
             ("בעד", "נגד"),
@@ -206,11 +206,11 @@ def print_pair_similarities(model: Word2Vec):
 
             sim = model.wv.similarity(w1, w2)  # cosine similarity
             print(f"similarity({w1}, {w2}) = {sim:.4f}")
-
+'''
 # ---------- MAIN ----------
 def main():
     if len(sys.argv) != 3:
-        print("Usage: python vec2word_knesset.py <corpus.jsonl> <output_dir>")
+        #print("Usage: python vec2word_knesset.py <corpus.jsonl> <output_dir>")
         sys.exit(1)
 
     corpus_path = sys.argv[1]
@@ -219,7 +219,7 @@ def main():
 
     # Part A: load + train Word2Vec
     tokenized_sentences, original_sentences = load_sentences(corpus_path)
-    print("Number of sentences:", len(tokenized_sentences))
+   # print("Number of sentences:", len(tokenized_sentences))
 
     # Word2Vec hyperparameters:
     # vector_size: embedding dimension
@@ -235,13 +235,13 @@ def main():
             epochs=10
         )
     except Exception as e:
-        print("Error during Word2Vec training:", e)
+       # print("Error during Word2Vec training:", e)
         sys.exit(1)
 
     try:
         model.save(os.path.join(out_dir, "knesset_word2vec.model"))
     except Exception as e:
-        print("Error saving Word2Vec model:", e)
+        #print("Error saving Word2Vec model:", e)
         sys.exit(1)
 
     # Part B.1: for each given word, find the top-5 most similar words
@@ -286,7 +286,7 @@ def main():
             f.write(f"{valid_sentences[i]}: most similar sentence: {valid_sentences[best]}\n")
 
     do_section_d(model, out_dir)
-    print_pair_similarities(model)
+    #print_pair_similarities(model)
 
 
 
